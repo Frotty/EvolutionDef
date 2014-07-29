@@ -1,0 +1,28 @@
+package UnitGene
+import Gene
+import ModelPathHandler
+
+constant ATTACKTYPES_AMOUNT = 5
+constant DEFENSETYPES_AMOUNT = 5
+
+public class UnitGene extends Gene
+	int atype
+	int dtype
+	
+	
+	override function decode(Frequence frq)
+		dtype = frq.decode(DEFENSETYPES_AMOUNT)
+		atype = frq.decode(ATTACKTYPES_AMOUNT)
+		tempGenotype = frq.decode(getMaxGenotypes())
+	
+	override function getMaxGenotypes() returns int
+		return 200
+	
+	override function mutate(int amount)
+	
+	override function applyTo(unit u)
+		// Not needed as this gene has to choose the unit
+		
+	function getUnit() returns unit
+		return null
+

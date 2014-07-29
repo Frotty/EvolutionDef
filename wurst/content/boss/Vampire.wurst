@@ -1,0 +1,41 @@
+package Vampire
+import MapStuff
+import UnitObjEditing
+import WaveManager
+import WavePool
+import ClosureTimers
+
+int BOSS_VAMP_ID
+boolean defeated = false
+
+trigger bossDeathTrig
+
+public class VampireBoss extends Creep
+
+	construct()
+		super(vec3(-1500,-1500, 100), BOSS_VAMP_ID, angle(0), STATUE_POS)
+
+public function startVampireBoss()
+	bossDeathTrig = CreateTrigger()
+	let cc = new SpawnContainer(copyCreepDef("Lesser Zombie"), 1, 0, SpawnerGroup.ALL )
+	doPeriodically(10., (CallbackPeriodic cb) -> begin
+		if defeated
+			destroy cb
+		else
+			WaveManager.spawn(cc)
+	end)
+	
+	new VampireBoss()
+	
+
+public function endVampireBoss()
+	print("You win! (sorry didn't have time for more bosses)")
+	
+
+public function init_VampireBoss(boolean c)
+	BOSS_VAMP_ID = UNIT_ID_GEN.next()
+	
+	if c
+		new UnitDefinition(BOSS_VAMP_ID, 'ugho')	
+		..setName("Vampire")..setModelFile("units\\undead\\Tichondrius\\Tichondrius.mdx")..setScalingValue(2.5)..setCollisionSize(128)
+		..setHitPointsMaximumBase(5000)..setSpeedBase(200)

@@ -1,0 +1,81 @@
+package Items
+import ItemObjEditing
+import ObjectIdGenerator
+import BonusHandler
+import Intermission
+import AllwaysItemDefinitions
+import PauseItemDefinitions
+import Players
+
+//Item classes store the level of the different properties of the item. When buying from shop, these aspects get increased.
+
+public int DMG_POWERUP_ID
+
+int array WEAPON_ITEM_IDS
+constant DMG_MAXLVL = 4
+constant ASPEED_MAXLVL = 4
+constant LIFESTEAL_MAXLVL = 4
+
+function getBonusDmg(int lvl) returns int
+	return lvl * 50
+	
+function getBonusAttackSpeed(int lvl) returns int
+	return 15 * lvl
+	
+function getBonusSpellDamage(int lvl) returns int
+	return 15 * lvl * lvl
+	
+function getBonusLifeSteal(int lvl) returns real
+	return 0.1 * lvl * lvl
+
+public class WeaponItem
+	int dmg = 0
+	int aspeed = 0
+	int lifesteal = 0
+	
+	function addBonuses(unit actor)
+		addUnitBonus(actor, Bonus.DAMAGE, getBonusDmg(dmg))
+		addUnitBonus(actor, Bonus.ATTACKSPEED, getBonusAttackSpeed(dmg))
+		
+	function upgradeDamage(unit actor)
+		if dmg < DMG_MAXLVL
+			dmg ++
+			addUnitBonus(actor, Bonus.DAMAGE, getBonusDmg(dmg)-getBonusDmg(dmg-1))
+			refreshWeapon(actor)
+		//else give back gold
+		
+	function refreshWeapon(unit actor)
+		for i = 0 to 5
+			if GetItemName( UnitItemInSlot(actor,i) ) == "Weapon"
+				actor.removeItem( UnitItemInSlot(actor,i) )
+		actor.addItem(WEAPON_ITEM_IDS[getWeaponId(dmg,aspeed,lifesteal)])
+
+function getWeaponId(int dmg, int asp, int lif) returns int
+	return lif + (LIFESTEAL_MAXLVL+1)*( asp + (ASPEED_MAXLVL+1)*( dmg ) )
+
+function getDescription(int dmg, int asp, int lif) returns string
+	var s = "Weapon\n\n"
+	s += "Extra Damage: " + getBonusDmg(dmg).toString() + "\n"
+	s += "Extra Attack Speed: " + getBonusAttackSpeed(asp).toString() + "\n"
+	//s += "Extra Spell Damage: " + getBonusSpellDamage(spdm).toString() + "\n"
+	s += "Extra Life Steal: " + (100*getBonusLifeSteal(lif)).toInt().toString() + "%\n"
+	return s
+
+public function init_Items(boolean c)
+
+	
+	// Creating every possible combination of item types.
+	for d = 0 to DMG_MAXLVL
+		for a = 0 to ASPEED_MAXLVL
+			for l = 0 to LIFESTEAL_MAXLVL
+				WEAPON_ITEM_IDS[getWeaponId(d,a,l)] = ITEM_ID_GEN.next()
+				if c
+					let def = new ItemDefinition(WEAPON_ITEM_IDS[getWeaponId(d,a,l)], 'rat9')
+					def..setName("Weapon")
+						//..setTooltipBasic("Weapon")
+						..setDescription(getDescription(d,a,l))
+						..setTooltipExtended(getDescription(d,a,l))
+						..setCanBeDropped(false)
+						..setCanBeSoldToMerchants(false)
+						..setInterfaceIcon("ReplaceableTextures\\CommandButtons\\BTNSteelMelee.blp")
+	

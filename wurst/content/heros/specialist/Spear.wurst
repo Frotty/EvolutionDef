@@ -1,0 +1,133 @@
+package Spear
+import HashMap
+import MapStuff
+import ChannelAbilityPreset
+import Projectile
+import LinkedList
+import Creep
+import CollisionDetection
+import ClosureTimers
+import Terrain
+import StunHandler
+import Interpolation
+
+public int SPEAR_SPELL_ID
+
+constant SPEAR_FX = "abilities\\weapons\\WyvernSpear\\WyvernSpearMissile.mdl"
+constant SPEAR_NAME = "Sausage Spear"
+constant SPEAR_HOTKEY = "W"
+constant SPEAR_MAXLVL = 4
+
+function getSpearDamage(int lvl) returns real
+	return 10. + 10 * lvl*lvl
+	
+function getSpearTargetCount(int lvl) returns int
+	return 1 + 2 * lvl*lvl
+
+function getSpearSpeed(int lvl) returns real
+	return (800.)
+	
+function getSpearRange(int lvl) returns real
+	return 400. + 50 * lvl
+	
+function getSpearCooldown(int lvl) returns int
+	return 26 - 2 * lvl
+	
+function getSpearManaCost(int lvl) returns int
+	return 30 + 5 * lvl
+
+class SpearCreep
+	Creep creep
+	real durPercent = 1.
+	vec2 offset
+	
+	construct(Creep c, vec2 offset)
+		creep = c
+		this.offset = offset
+	
+public class Spear extends Projectile
+	LinkedList<SpearCreep> targets = new LinkedList<SpearCreep>()
+	
+	construct( vec3 pos, player owner, angle xyAngle, int lvl )
+		super(pos , owner, xyAngle, SPEAR_FX )
+		
+		setRanged(getSpearRange(lvl))
+		setSpeed(getSpearSpeed(lvl))
+		setFixedFlyHeight(30)
+		
+		fx.getDummy().registerOnHitCallback(32, true, (unit hit, unit hitter) -> begin
+			if fx.getDummy() == hitter
+				if hit.isAliveTrick() and hit.getEntity() instanceof Creep  
+					var affected = false
+					//Checking if not targeted here
+					for t in targets
+						if t.creep.actor == hit
+							affected = true
+							break
+					if not affected
+						var c = hit.getEntity() castTo Creep
+						// Todo MASS handling
+						if targets.getSize() < getSpearTargetCount(lvl)
+							//If everything fine, then add.
+							targets.add(new SpearCreep(c, c.getPos2()))
+							c.active = false
+							c.actor..setTurnSpeed(0)..setPropWindow(0)
+							
+						fx.getDummy().damageTarget(hit, getSpearDamage(lvl))
+		end)
+		
+		
+	override function update()
+		for screep in targets
+			if screep.creep.actor.isAliveTrick()
+				screep.durPercent *= screep.creep.weightFactor
+				if screep.durPercent < 0.05
+					targets.remove(screep)
+					screep.creep.active = true
+					destroy screep
+					screep.creep.actor..setTurnSpeed(0.6)..setPropWindow(80)
+				else
+					screep.creep.setPos3(getPos3() + vec3((64*screep.durPercent - 32) * xyAngle.cos(),(128*screep.durPercent - 64) * xyAngle.sin(),0) + screep.offset, true)
+					screep.creep.actor.setFlyHeight(0,0)
+			else
+				targets.remove(screep)
+				screep.creep.active = true
+				screep.creep.actor.setPropWindow(GetUnitDefaultPropWindow(screep.creep.actor))
+				destroy screep
+		super.update()
+		
+		
+	ondestroy
+		fx.getDummy().removeOnHitCallback()
+		for t in targets
+			t.creep.actor..setTurnSpeed(0.6)..setPropWindow(80)
+		destroy targets
+
+
+
+public function init_Spear(boolean compileTime)
+	SPEAR_SPELL_ID = ABIL_ID_GEN.next()
+	
+	if compileTime
+		var def = new ChannelAbilityPreset(SPEAR_SPELL_ID, 4)
+		// Set Attributes
+		def..removeChannelProperties(true, true)
+			..setButtonPositionNormalX(1)..setButtonPositionNormalY(2)
+			..setButtonPositionResearchX(1)..setButtonPositionResearchY(0)
+			..presetIcon("BTNBloodFilledGlassArrow")
+			..presetTargetTypes(Targettype.PUTARGET)..presetHotkey(SPEAR_HOTKEY)
+			..setLevels(SPEAR_MAXLVL)
+			..setOrderStringActivate("starfall")
+		for i = 1 to 4
+			def..setCastRange(i,1000)
+			..setCooldown(i, getSpearCooldown(i) * 1.)
+			..setManaCost(i, getSpearManaCost(i))
+			
+		
+		new AbilityTooltipGenerator(SPEAR_NAME, SPEAR_HOTKEY, Targettype.PUTARGET, SPEAR_MAXLVL, "Specialist throws a spear which drags enemies along it's path.")
+		..addProperty("Travel Range:", (int lvl) -> getSpearRange(lvl).toString())
+		..addProperty("Cooldown:", (int lvl) -> getSpearCooldown(lvl).toString())
+		..addProperty("Maximum targets:", (int lvl) -> getSpearTargetCount(lvl).toString())
+		..addProperty("Damage:", (int lvl) -> getSpearDamage(lvl).toString())
+		..applyToDef(def)
+		

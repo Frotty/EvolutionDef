@@ -1,0 +1,9 @@
+package GeneRegister
+import ColorGene
+import UnitGene
+import Chromosome
+
+//To keep the Gene ordering same in the Chromosome
+public function registerGenes()
+	Chromosome.unitGene = new UnitGene()
+	Chromosome.registerGene(new ColorGene())

@@ -1,0 +1,99 @@
+package CrushingHalo
+import ClosureTimers
+import ClosureForGroups
+import Entity
+import Creep
+import Hero
+import Fx
+import AbilityTooltipGenerator
+
+public int CRUSHING_HALO_SPELL_ID
+
+constant CRUSHING_HALO_NAME = "Crushing Halo"
+constant CRUSHING_HALO_HOTKEY = "R"
+constant CRUSHING_HALO_COOLDOWN = 90
+constant CRUSHING_HALO_MAXLVL = 2
+constant CRUSHING_HALO_DESCR = "Crusader releases a massive halo of light, damaging and knocking up enemies in a circle.\n" +
+								 "Also Heals allies compared to their missing Health."
+
+function getCrushingHaloRadius(int lvl) returns real
+	return (lvl* 100. + 400)
+	
+function getCrushingHaloDamage(int lvl) returns real
+	return 100. + 75 * lvl
+
+function getCrushingHaloHealPercent(int lvl) returns real
+	return 0.2 + 0.05 * lvl
+	
+function getCrushingHaloCooldown(int lvl) returns real
+	return 60 - 2.*lvl
+	
+function getCrushingHaloManaCost(int lvl) returns int
+	return 100 + 20 * lvl
+
+public class CrushingHalo
+	group effected
+	vec3 pos
+	unit dmger
+	int level
+	real range
+	
+	construct(vec3 p, int level, unit dmger)
+		this.dmger = dmger
+		pos = p
+		this.level = level
+		effected = CreateGroup()
+		start()
+	
+	function start()
+		range = 30
+		let duration = 1.
+		let speed = (getCrushingHaloRadius(level)/duration)*ANIMATION_PERIOD
+		
+		var eff = new Fx(pos.x,pos.y,angle(0))
+		eff.setFx("Models\\LightNova.mdl")
+		eff.setScale(getCrushingHaloRadius(level)/100 * 0.1)
+		doPeriodicallyTimed(ANIMATION_PERIOD,duration,(CallbackCounted cb)->begin
+			forUnitsInRange(pos.toVec2(),range,(unit u)->begin
+				if u.isAliveTrick() and not IsUnitInGroup(u,effected)
+					if u.getEntity() instanceof Creep
+						let c = u.getEntity() castTo Creep
+						c.applyVel(vec3(0,0,30))
+						effected.addUnit(u)
+						dmger.damageTarget(u,getCrushingHaloDamage(level))
+					if u.getEntity() instanceof Hero and u != dmger
+						//Restore percentage of the missing hp
+						u.setHP(u.getHP() + (u.getMaxHP()- u.getHP())*getCrushingHaloHealPercent(level)) 
+						effected.addUnit(u)
+						AddSpecialEffectTarget("Abilities\\Spells\\Human\\Resurrect\\ResurrectTarget.mdl",u,"origin").destr()
+			end)
+			range += speed
+			if cb.isLast()
+				destroy eff
+		end)
+		effected.clear()
+		
+	
+public function init_CrushingHalo(boolean compileTime)
+	
+	CRUSHING_HALO_SPELL_ID = ABIL_ID_GEN.next()
+	
+	if compileTime
+
+		var crushinghalo = new ChannelAbilityPreset(CRUSHING_HALO_SPELL_ID, CRUSHING_HALO_MAXLVL)
+		crushinghalo..removeChannelProperties(true, true)..setName("Crushing Halo")
+			..setButtonPositionNormalX(3)..setButtonPositionNormalY(2)
+			..setButtonPositionResearchX(3)..setButtonPositionResearchY(0)
+			..presetIcon("BTNHoly")
+			..setOrderStringActivate("holybolt")..setRequiredLevel(6)..setLevelSkipRequirement(3)
+		for i = 1 to 4
+			crushinghalo..setManaCost(i, getCrushingHaloManaCost(i))
+			..setCooldown(i, getCrushingHaloCooldown(i))
+			
+		new AbilityTooltipGenerator(CRUSHING_HALO_NAME, CRUSHING_HALO_HOTKEY, Targettype.NOTARGET, CRUSHING_HALO_MAXLVL, CRUSHING_HALO_DESCR)
+		..addProperty("Area of Effect:", (int lvl) -> getCrushingHaloRadius(lvl).toString())
+		..addProperty("Damage:", (int lvl) -> getCrushingHaloDamage(lvl).toString())
+		..addProperty("Ally heal% :", (int lvl) -> (getCrushingHaloHealPercent(lvl)*100).toInt().toString())
+		..addProperty("Cooldown:", (90.).toString())
+		..applyToDef(crushinghalo)
+		

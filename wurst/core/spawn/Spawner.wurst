@@ -1,0 +1,60 @@
+package Spawner
+import GameConstants
+import LinkedList
+import MapStuff
+import UnitObjEditing
+import Creep
+import MapBounds
+import ObjectIds
+import Flipper
+import Mammoth
+
+public LinkedList<Spawner> spawners = new LinkedList<Spawner>()
+int SPAWNER_ID
+public Spawner NORTH
+public Spawner EAST
+public Spawner WEST
+
+public class Spawner
+	unit actor
+	vec2 pos
+	vec2 target
+
+	construct(vec2 pos, vec2 target)
+		this.pos = pos
+		actor = createUnit(CREEP_PLAYER, SPAWNER_ID, pos, angle(0))
+		spawners.add(this)
+		this.target = target
+		
+	function spawnCreep(CreepDefinition def)
+		switch def.ctype
+			case CREEP
+				var c = new Creep(pos.toVec3(), def.id, pos.angleTo(playableCenter), target)
+				c.weightFactor = def.weightFac
+			case FLIPPER
+				var c = new Flipper(pos.toVec3(), def.id, pos.angleTo(playableCenter), target)
+				c.weightFactor = def.weightFac
+			case MAMMOTH
+				var c = new Mammoth(pos.toVec3(), def.id, pos.angleTo(playableCenter), target)
+				c.weightFactor = def.weightFac
+			default
+				var c = new Creep(pos.toVec3(), def.id, pos.angleTo(playableCenter), target)
+				c.weightFactor = def.weightFac
+				
+		
+	
+public function init_Spawner(boolean compiletime)
+	SPAWNER_ID = UNIT_ID_GEN.next()
+	
+	if compiletime
+		let def = new BuildingDefinition(SPAWNER_ID, 'hhou')
+		def..setFoodProduced(0)
+		..setModelFile("buildings\\other\\PowerGenerator\\PowerGenerator.mdx")
+		..setName("Spawner")
+		..setNormalAbilities("Avul")
+		..setTintingColorRed(150)..setTintingColorBlue(150)..setTintingColorGreen(150)
+	else
+		WEST = new Spawner(vec2(-1800,-1800),playableCenter)
+		NORTH = new Spawner(vec2(-500,2400),playableCenter)
+		EAST = new Spawner(vec2(1800,-1100),playableCenter)
+		

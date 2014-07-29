@@ -1,0 +1,64 @@
+package WaveManager
+import WavePool
+import Spawner
+import ClosureTimers
+import GameTimer
+import Intermission
+import GameConstants
+import initlater Vampire
+
+constant INTERMISSION_DURATION = 20.
+
+public class WaveManager
+	static Queue<WavePool> waves
+	static WavePool currentWave = null
+	static timer waveTimer = CreateTimer()
+	static real waveStartTime
+	static boolean finished = false
+	
+	static function addAllWaves(Queue<WavePool> waves)
+		WaveManager.waves = waves
+		
+	static function startNextWave()
+		printTimed("|cff086BAD>> |cffFFD64ANew Wave incoming!", 10)
+		if currentWave != null
+			destroy currentWave
+		currentWave = waves.dequeue()
+		waveStartTime = getElapsedGameTime()
+		finished = false
+		doPeriodically(0.25, (CallbackPeriodic cb) -> begin
+			let gameTime = getElapsedGameTime()
+			for sp in currentWave.spawns
+				if waveStartTime + sp.time < gameTime 
+					if sp.amount > 0
+						spawn(sp)
+					else
+						currentWave.spawns.remove(sp)
+						destroy sp
+			if currentWave.spawns.getSize() <= 0
+				WaveManager.onPropertyTrig.enable()
+		end)
+		
+	static trigger onPropertyTrig = CreateTrigger()
+	
+		
+	static function spawn(SpawnContainer sc)
+		switch sc.where
+			case SpawnerGroup.ALL
+				for s in spawners
+					s.spawnCreep(sc.creepDef)
+			case SpawnerGroup.NORTH
+				NORTH.spawnCreep(sc.creepDef)
+			case SpawnerGroup.EAST
+				EAST.spawnCreep(sc.creepDef)
+			case SpawnerGroup.WEST
+				WEST.spawnCreep(sc.creepDef)
+		sc.amount--
+					
+init
+	WaveManager.onPropertyTrig..registerPlayerStateEvent(CREEP_PLAYER, PLAYER_STATE_RESOURCE_FOOD_USED, LESS_THAN_OR_EQUAL, 0.00)
+	..addAction(() -> begin
+		startIntermission(INTERMISSION_DURATION, "Wave cleared!")
+		WaveManager.onPropertyTrig.disable()
+	end)
+	WaveManager.onPropertyTrig.disable()

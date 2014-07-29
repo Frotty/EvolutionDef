@@ -1,0 +1,163 @@
+package Crusader
+import MapStuff
+import Fx
+import Creep
+import Hero
+import ChannelAbilityPreset
+import AbilityObjEditing
+import TempGroups
+import ClosureEvents
+import ClosureForGroups
+import ClosureTimers
+import BonusHandler
+import CrushingHalo
+import BackOff
+import SafeGuard
+import Terrain
+import AbilityTooltipGenerator
+
+int CRUSADER_ID
+
+int PHALANX_SPELL_ID
+
+function getPhalanxArmor(int lvl) returns real
+	return 0.5 + 0.5 * lvl
+	
+function getPhalanxCooldown(int lvl) returns real
+	return 5-lvl*1.
+
+public class Crusader extends Hero
+	trigger summontrigger
+	boolean ph_active = false
+	vec2 ph_pos
+	angle ph_facing
+	unit ph_unit1
+	unit ph_unit2
+	boolean ph_1_set = false
+	int ph_armor
+	
+	
+	construct(vec3 pos, player owner )
+		super(pos, owner, CRUSADER_ID)
+		summontrigger = CreateTrigger()
+		summontrigger.registerUnitEvent(actor,EVENT_UNIT_SUMMON)
+		summontrigger.addAction(function addPhalanx)
+		
+	override function onCast(int spellId, int lvl)
+		switch spellId
+			case PHALANX_SPELL_ID
+				ph_pos = actor.getPos()
+				ph_facing = actor.getFacingAngle()
+				ph_1_set = false
+				addUnitBonus(actor,Bonus.ARMOR, - ph_armor)
+	
+	override function onUnitCast(int spellId, unit target, int lvl)
+		switch spellId
+			case BACKOFF_SPELL_ID
+				castBackOff(getPos2(),actor,lvl)
+			case SAFEGUARD_SPELL_ID
+				new SafeGuardCast(this, target,lvl) 
+			case CRUSHING_HALO_SPELL_ID
+				new CrushingHalo(getPos3(), lvl ,actor)
+		
+	override function onPointCast(int spellId, vec2 target, int lvl)
+	
+		
+	static function addPhalanx()
+		unit source = GetSummoningUnit()
+		Crusader c = source.getEntity() castTo Crusader
+		if not IsUnitIllusion(GetSummonedUnit())
+			c.actor.setFacing(c.ph_facing)
+			//Throwing him from the air, so it ignores unit collosions when falling down (hopefully)
+			c.setPos3(c.ph_pos.toVec3() + vec3(0,0,30 + getTerrainZ(c.ph_pos.x,c.ph_pos.y)), true)
+			c.actor.issueImmediateOrderById(851993) //Hold Position
+			c.actor.setAnimation("defend")
+			c.ph_active = true
+			var added_armor = 0
+			//Phalanx checks every second if Crusader moved, and adds the right amount of armor
+			doPeriodically(1., (CallbackPeriodic cb)->begin
+				var nearby = 1
+				//Counting the units Nearby to get how many extra armor we should add.
+				forUnitsInRange(c.getPos2(),600,(unit u)->begin
+					if GetFilterUnit().getEntity() instanceof Creep and GetFilterUnit().isAliveTrick()
+						nearby ++
+				end)
+				var armor = (nearby * getPhalanxArmor(c.actor.getAbilityLevel(PHALANX_SPELL_ID))).toInt()
+				//We only want to add the difference every period. If we used absolute values, other extra Armor effects could be hurt.
+				addUnitBonus(c.actor,Bonus.ARMOR, armor - added_armor)
+				added_armor = armor
+				ENUM_GROUP.clear()
+				//If Crusader is too far away, the ability shall be disabled
+				if (c.getPos2() - c.ph_pos).length() > 50
+					c.ph_unit1.kill()
+					c.ph_unit2.kill()
+					c.ph_active = false
+					//Removing the bonus armor
+					addUnitBonus(c.actor,Bonus.ARMOR, - added_armor)
+					added_armor = 0
+					//Since this callback doesnt destroy automatically, interrupt is needed this way
+					destroy cb
+			end)
+			c.ph_armor = added_armor
+		else
+			angle f = c.ph_facing + angle(PI/2)
+			if c.ph_1_set == false
+				c.ph_unit1 = GetSummonedUnit()
+				c.ph_unit1..setFacing(c.ph_facing)
+					//..setPathing(false)
+					..setPos(c.ph_pos.polarOffset(f,100))
+					..setPropWindow(0)
+					..setAnimation("defend")
+					//..setPathing(true)
+				c.ph_1_set = true
+			else
+				c.ph_unit2 = GetSummonedUnit()
+				c.ph_unit2..setFacing(c.ph_facing)
+					//..setPathing(false)
+					..setPos(c.ph_pos.polarOffset(f,-100))
+					..setPropWindow(0)
+					..setAnimation("defend")
+					//..setPathing(true)
+				
+		
+public function init_Crusader(boolean compiletime)
+	CRUSADER_ID = HERO_ID_GEN.next()
+	// generate valid id
+	init_BackOff(compiletime)
+	init_SafeGuard(compiletime)
+	PHALANX_SPELL_ID = ABIL_ID_GEN.next()
+	init_CrushingHalo(compiletime)
+	
+	if compiletime
+		// Generate def if compieltime
+		
+		var phalanx = new AbilityDefinitionBladeMasterMirrorImage(PHALANX_SPELL_ID)
+		phalanx..setName("Phalanx")..setLevels(4)
+			..setButtonPositionNormalX(1)..setButtonPositionNormalY(2)
+			..setButtonPositionResearchX(1)..setButtonPositionResearchY(0)
+			..setNumberofImages(1,2)..setDamageDealt(1,0)..setDamageTaken(1,1.2)
+			..setManaCost(1,0)..setIconNormal("ReplaceableTextures\\CommandButtons\\BTN_cr_charge.blp")
+			..setIconResearch("ReplaceableTextures\\CommandButtons\\BTN_cr_charge.blp")
+		for i = 1 to 4
+			phalanx.setCooldown(i, getPhalanxCooldown(i))
+			//..setTooltipLearnExtended("Creates two identical Crusader fighters in a formation. Crusader will gain extra armor based on the number of zombies around, as long as he stays in the formation.")
+		// Doesnt work with mirrorImage preset:
+		new AbilityTooltipGenerator("Phalanx","W",Targettype.NOTARGET,4, "Creates two phalanx buddies")
+			..addProperty("Extra Armor/enemy:", (int lvl) -> getPhalanxArmor(lvl).toString())
+			..addProperty("Cooldown:", (10.).toString())
+			..applyToDef(phalanx)
+		let preset = new HeroPreset(CRUSADER_ID, 'Hlgr', "Crusader")
+		preset..addProperName("Eric")
+			..setModelFile("units\\other\\BloodElfLieutenant\\BloodElfLieutenant.mdl")
+			..addHeroAbility(BACKOFF_SPELL_ID)
+			..addHeroAbility(PHALANX_SPELL_ID)
+			..addHeroAbility(SAFEGUARD_SPELL_ID)
+			..addHeroAbility(CRUSHING_HALO_SPELL_ID)
+			..setStartingAgility(15)..setAgilityPerLevel(1.8)
+			..setStartingIntelligence(17)..setIntelligencePerLevel(2)
+			..setStartingStrength(22)..setStrengthPerLevel(2.8)
+			
+		// Build at the end
+			..buildHero()
+		
+		

@@ -1,0 +1,44 @@
+package Mammoth
+import Creep
+import MapBounds
+import ObjectIds
+
+CreepDefinition PARASITE_DEF
+let parasite_dropping_rate = 7
+
+constant MAMMOTH_BOUNTY = 35
+constant PARASITE_BOUNTY = 2
+//Units\\Creeps\\MammothBlack\\MammothBlack.mdl
+
+public class Mammoth extends Creep//Upon taking damage parasites fall from it.
+	real lastPercent //throws a parasite every 5% of his life
+
+	construct(vec3 pos, int id, angle a, vec2 target)
+		super( pos, id, a, target)
+		lastPercent = 100
+		bounty = MAMMOTH_BOUNTY
+		
+	override function update()
+		super.update()
+		let percent = actor.getHP()/actor.getMaxHP() * 100
+		if percent <= lastPercent - parasite_dropping_rate
+			
+			throwParasite()
+			lastPercent -= parasite_dropping_rate
+			
+	function throwParasite()
+		var par = new Creep(getPos3() + vec3(0,0,30), PARASITE_DEF.id, actor.getFacingAngle(), playableCenter)
+		par.bounty = PARASITE_BOUNTY
+		par.setVel( vec3(GetRandomReal(-8, 8),GetRandomReal(-8, 8), GetRandomReal(16, 24)) )
+		par.actor.setAnimation("birth")
+		
+
+public function init_Mammoth(boolean compiletime)
+	PARASITE_DEF = new CreepDefinition("Parasite")
+	// Set Values..
+	PARASITE_DEF.hp = 30
+	PARASITE_DEF.damage = 6
+	PARASITE_DEF.modelPath = "units\\critters\\DuneWorm\\DuneWorm.mdl"
+	PARASITE_DEF.collisionSize = 4
+	if compiletime
+		PARASITE_DEF.generateObject()

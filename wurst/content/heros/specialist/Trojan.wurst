@@ -1,0 +1,126 @@
+package Trojan
+
+import MapStuff
+import ClosureTimers
+import LinkedList
+import Texttag
+import ClosureEvents
+
+public int TROJAN_SPELL_ID
+constant GHOST = 'Agho'
+
+constant ATTACK_ORDER_ID = 851971
+constant TROJAN_NAME = "Slink"
+constant TROJAN_HOTKEY = "E"
+constant TROJAN_MAXLVL = 4
+
+LinkedList<TrojanBuff> trojans
+
+function getTrojanDuration(int lvl) returns real
+	return 10. + 5. * lvl
+	
+function getTrojanDamage(real dist, int lvl) returns real
+	return dist * 0.0525 * (1 + (0.5 * lvl))
+	
+function getTrojanCooldown(int lvl) returns real
+	return getTrojanDuration(lvl) + 5
+	
+function getTrojanManaCost(int lvl) returns int
+	return 120 - 20*lvl
+
+public class TrojanBuff
+	real dist
+	real damage
+	unit caster
+	int lvl
+	vec2 tmploc
+	texttag tt
+	CallbackPeriodic ttcb
+
+	construct(unit actor, int lvl)
+		trojans.add(this)
+		damage = 0.
+		caster = actor
+		this.lvl = lvl
+		dist = 0.
+		tmploc = actor.getPos()
+		
+		actor.addAbility(GHOST)
+		tt = createTTEx(actor.getPos().withZ(150), "", 10, colorA(230,78,87,255))
+		
+		doAfter(getTrojanDuration(lvl), ()-> begin
+			if actor.hasAbility(GHOST)
+				actor.removeAbility(GHOST)
+		end)
+		
+		ttcb = (CallbackPeriodic cab)->begin
+			if actor.hasAbility(GHOST)
+				dist += tmploc.distToVec(actor.getPos())
+				tmploc = actor.getPos()
+				damage = getTrojanDamage(dist, lvl)
+				tt.setText(damage.toInt().toString(), 10)
+				tt.setPos(tmploc.withZ(50))
+		end
+		
+		var t = CreateTrigger()
+		t.registerUnitEvent(actor,EVENT_UNIT_ISSUED_TARGET_ORDER)
+		t.addAction(()->begin
+//			print("order: " + GetIssuedOrderId().toString())
+			if GetIssuedOrderId() == ATTACK_ORDER_ID
+//				print("Is Attacking.")
+				for tro in trojans
+//					print("loop...")
+					if GetOrderedUnit() == tro.caster
+//						print("Got you!!")
+						GetTriggeringTrigger().destr()
+						tro.endTrojan(GetTriggerUnit())
+						
+						destroy tro
+		end)
+		
+		doPeriodically(ANIMATION_PERIOD, ttcb)
+		
+		
+	function endTrojan( unit target)
+		
+		OnDamage ond = (unit damaged, unit source, real amount) -> begin
+			if source == caster
+				print("Damage")
+		end
+		
+		caster.damageTarget(target, damage)
+		
+		onDamage(target, ond)
+		
+		
+	ondestroy
+		trojans.remove(this)
+		destroy ttcb
+		tt.destr()
+
+
+public function init_Trojan(boolean compileTime)
+	trojans = new LinkedList<TrojanBuff>()
+
+	TROJAN_SPELL_ID = ABIL_ID_GEN.next()
+	
+	if compileTime
+		// Generate def if compieltime
+		// Set Attributes
+		var trojan = new ChannelAbilityPreset(TROJAN_SPELL_ID, 4)
+		// Set Attributes
+		trojan..removeChannelProperties(true, true)..setName("Trojan")
+			..setButtonPositionNormalX(2)..setButtonPositionNormalY(2)
+			..setButtonPositionResearchX(2)..setButtonPositionResearchY(0)
+			..presetIcon("BTNWispSplode")
+			..presetTargetTypes(Targettype.NOTARGET)..presetHotkey(TROJAN_HOTKEY)
+		for lvl = 1 to TROJAN_MAXLVL
+			trojan..setCooldown(lvl,getTrojanCooldown(lvl))
+			..setManaCost(lvl, getTrojanManaCost(lvl))
+			
+		new AbilityTooltipGenerator(TROJAN_NAME, TROJAN_HOTKEY, Targettype.NOTARGET, TROJAN_MAXLVL, "Specialist hides himself from enemies by covering himself in zombie blood.")
+		..addProperty("Duration:", (int lvl) -> getTrojanDuration(lvl).toString())
+		..addProperty("Cooldown:", (int lvl) -> getTrojanCooldown(lvl).toString())
+		..applyToDef(trojan)
+		
+	

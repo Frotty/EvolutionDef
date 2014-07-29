@@ -1,0 +1,215 @@
+package Cage
+import Hero
+import Creep
+import Entity
+import Lightning
+import ClosureTimers
+import AbilityTooltipGenerator
+import ClosureForGroups
+import LinkedList
+import BuffHandler
+
+public int CAGE_SPELL_ID
+public int CAGE_SECONDARY_SPELL_ID
+int CAGE_NODE_ID
+BuffDef CAGE_BUFF_DEF
+
+constant CAGE_NAME = "Electric Cage"
+constant CAGE_HOTKEY = "R"
+constant CAGE_MAXLVL = 2
+
+constant color_avail = colorA(100,255,100,64)
+constant color_active = colorA(255,255,255,192)
+constant color_unavail = colorA(255,50,50,64)
+
+constant zoffset = vec3(0,0,60)
+constant ACTIVATION_DIST = 60.
+
+public function getCageDuration(int lvl) returns real
+	return 15. + lvl
+	
+function getCagePower(int lvl) returns real
+	return 27.5 + 2.5 * lvl
+	
+function getCageDamage(int lvl) returns real
+	return 7.5 + 2.5 * lvl
+	
+function getCageCooldown(int lvl) returns int
+	return 32 - 6  * (lvl-1)
+	
+function getCageManaCost(int lvl) returns int
+	return 60
+	
+function getCageMaxRange(int lvl) returns real
+	return 400. + 100. * lvl
+	
+function getCageMinRange() returns real
+	return 120.
+
+public class CageNode extends Entity
+
+	lightning lng
+	boolean fixed = false
+	boolean canfix = false
+	
+	construct( vec3 pos, player owner)
+		super(pos, new Fx(pos, angle(0), "Models\\StormTotem.mdl"))
+		fixed = false
+		fx.setScale(0.8)
+		fx.setPos(pos.x, pos.y, 0)
+		fx.getDummy()
+		fx.setOwner(owner, true)
+		
+	override function update()
+	
+	ondestroy
+		lng.destr()
+
+public class Cage
+	LinkedList<CageNode> nodes
+	group effected
+	Hero caster
+	int lvl
+	int i = 0
+	
+	construct(vec3 pos, Hero caster,int level)
+		//Creating the lists
+		nodes = new LinkedList<CageNode> ()
+		effected = CreateGroup()
+		//add a new node right away
+		nodes.add(new CageNode(pos,caster.owner))
+		lvl = level
+		this.caster = caster
+		caster.owner.setAbilityAvailable(CAGE_SPELL_ID, false)
+		caster.actor.addAbility(CAGE_SECONDARY_SPELL_ID)
+		caster.actor.setAbilityLevel(CAGE_SECONDARY_SPELL_ID, lvl)
+		nodes.get(nodes.getSize()-1).lng = addLightning("FORK", true, pos+zoffset, caster.getPos3()+zoffset)
+		nodes.get(nodes.getSize()-1).lng.setColor(color_unavail)
+		doPeriodicallyTimed(ANIMATION_PERIOD,getCageDuration(lvl), (CallbackCounted cb)-> begin 
+			update()
+			if cb.isLast()
+				destroy this
+		end)
+		
+	function addNode(vec3 pos)
+		var size = nodes.getSize()
+		if nodes.get(size-1).canfix
+			nodes.get(size-1).fixed = true
+			if size < 4
+				//Adding new nodes to the "fence"
+				nodes.add(new CageNode(pos,caster.owner))
+				size = nodes.getSize()
+				nodes.get(size-1).lng = addLightning("FORK", true, pos+zoffset, caster.getPos3()+zoffset)
+				nodes.get(size-1).lng.setColor(color_unavail)
+				//lightnings not act as intended, for example the lighting created above is not visible in game
+//				print("Node added: " + nodes.getSize().toString() + " and " + nodes.get(size-1).fx.getDummy().getHandleId().toString())
+				if size >= 2
+					//If there are more then 2 lightnings, the latter shall be "fixed" to the two nodes before. 
+					//Since position is right because update, there is no need to move, only color
+					nodes.get(size-2).lng.setColor(color_active)
+					if size == 4
+						nodes.get(size-1).lng.move(true, nodes.get(size-1).getPos3()+zoffset, nodes.get(0).getPos3()+zoffset)
+						var dist =  nodes.get(0).getPos2().distToVec(nodes.get(size-1).getPos2())
+						if not (dist > getCageMaxRange(lvl) ) //Isn't checking minDistance at last segment.
+							nodes.get(size-1).canfix = true
+							nodes.get(size-1).lng.setColor(color_avail)
+					else
+						nodes.get(size-1).lng.move(true, nodes.get(size-1).getPos3()+zoffset, nodes.get(size-2).getPos3()+zoffset)
+			else if size == 4
+				caster.actor.removeAbility(CAGE_SECONDARY_SPELL_ID)
+				caster.owner.setAbilityAvailable(CAGE_SPELL_ID, true)
+				nodes.get(size-1).lng.setColor(color_active)
+	
+	function update()
+		let size = nodes.getSize()
+		if size < 4
+			var n = nodes.get(size-1)
+			n.lng.move(true, n.getPos3()+zoffset, caster.getPos3()+zoffset)
+			var dist =  caster.getPos2().distToVec(n.getPos2())
+			if dist > getCageMaxRange(lvl) or dist < getCageMinRange()
+				if n.canfix
+					n.canfix = false
+					n.lng.setColor(color_unavail)
+			else
+				if not n.canfix
+					n.canfix = true
+					n.lng.setColor(color_avail)
+					
+		for i = 0 to size-1 //Looping until the last ACTIVE nod
+			var n1 = nodes.get(i)
+			if n1.fixed
+				CageNode n2
+				if i == 3
+					n2 = nodes.get(0)
+				else
+					n2 = nodes.get(i+1)
+				var middle = vec2((n1.getPos3().x + n2.getPos3().x)/2.,(n1.getPos3().y + n2.getPos3().y)/2.)
+				var radius = n1.getPos3().distToVec2d(n2.getPos2()) / 2.
+				forUnitsInRange(middle,radius,(unit u)->begin
+					string s = "In Cage Range"
+					if u.isAliveTrick() and u.getEntity() instanceof Creep
+						var c = u.getEntity() castTo Creep
+						s += "and Creep"
+						if not c.flying and c.getPos3().toVec2().distToSegmentSquared(n1.getPos3().toVec2(), n2.getPos3().toVec2() ) < ACTIVATION_DIST.squared()
+							s+= "and adding velocity"
+							if not IsUnitInGroup(u,effected) // and u.hasAbility(CAGE_BUFF_DEF.buff_id)
+								c.applyVel(vec2(0,0).polarOffset(u.getFacingAngle() + angle(PI),getCagePower(lvl)*(size/4)).toVec3())
+								caster.actor.damageTarget(u,getCageDamage(lvl))
+								u.applyBuff(CAGE_BUFF_DEF, 1.)
+								effected.addUnit(u)
+								doAfter(1.,()-> effected.removeUnit(u))
+				end)
+				
+		//if e.alive and not e.flying and e.pos.toVec2().distToSegmentSquared(pos.toVec2(), l.linkedNode.pos.toVec2() ) < ACTIVATION_DIST.squared()
+	
+	ondestroy
+		for n in nodes
+			destroy n
+		destroy nodes
+		effected.clear()
+		if caster.actor.hasAbility(CAGE_SECONDARY_SPELL_ID)
+			caster.actor.removeAbility(CAGE_SECONDARY_SPELL_ID)
+			caster.owner.setAbilityAvailable(CAGE_SPELL_ID, true)
+			
+function buildCageSpell(int id, int lvl) returns ChannelAbilityPreset
+	var pr = new ChannelAbilityPreset(id, lvl)
+		..removeChannelProperties(true, true)..setName("Cage")
+		..setButtonPositionNormalX(3)..setButtonPositionNormalY(2)
+		..setButtonPositionResearchX(3)..setButtonPositionResearchY(0)
+		..presetIcon("BTNStaticShock")
+		..setOrderStringActivate("holybolt")..presetHotkey(CAGE_HOTKEY)..setRequiredLevel(6)
+		..setLevelSkipRequirement(3)
+	for i = 1 to 4
+		if id == CAGE_SPELL_ID
+			pr..setCooldown(i, getCageCooldown(i) * 1.)	
+			..setManaCost(i, getCageManaCost(i))
+		else
+			pr..setCooldown(i, 1.)	
+			..setManaCost(i, 0)
+	return pr
+			
+public function init_Cage(boolean compileTime)
+	
+	CAGE_SPELL_ID = ABIL_ID_GEN.next()
+	CAGE_SECONDARY_SPELL_ID = ABIL_ID_GEN.next()
+	
+	CAGE_BUFF_DEF = new BuffDef("Shocked", "This unit is shocked, and cant get hit by electric spells meanwhile", "BTNOrbOfLightning")
+	CAGE_BUFF_DEF.stacking = false
+	CAGE_BUFF_DEF.buffArt = "Abilities\\Spells\\Orc\\LightningShield\\LightningShieldBuff.mdl"
+	
+	if compileTime
+		CAGE_BUFF_DEF.generate()
+		
+		var cage = buildCageSpell(CAGE_SPELL_ID, CAGE_MAXLVL)
+		..setCooldown(1,30)
+			
+		var cagesecondary = buildCageSpell(CAGE_SECONDARY_SPELL_ID, CAGE_MAXLVL)
+
+		new AbilityTooltipGenerator(CAGE_NAME, CAGE_HOTKEY, Targettype.NOTARGET, CAGE_MAXLVL, "Creates fence of electricity knocking not letting enemies pass.")
+		..addProperty("Effect Duration:", (int lvl) -> getCageDuration(lvl).toString())
+		..addProperty("Cooldown:", (int lvl) -> getCageCooldown(lvl).toString())
+		..addProperty("Knockback Power:", (int lvl) -> getCagePower(lvl).toString())
+		..addProperty("Damage:", (int lvl) -> getCageDamage(lvl).toString())
+		..applyToDef(cage)
+		..applyToDef(cagesecondary)
+		

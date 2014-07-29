@@ -1,0 +1,131 @@
+package Xplosives
+import Explosive
+import Hero
+import ClosureForGroups
+import XBurn
+import Creep
+import AbilityTooltipGenerator
+import SoundHelper
+import ClosureTimers
+import Terrain
+import Interpolation
+
+public int EXPLOSIVES_SPELL_ID
+int MAX_EXPLOSIVES_ID
+
+constant XPLOSIVES_NAME = "Xplosives"
+constant XPLOSIVES_HOTKEY = "Q"
+constant XPLOSIVES_COOLDOWN = 35
+constant XPLOSIVES_MAXLVL = 4
+constant PLACE_SOUND = new Sound("Sounds\\sfx_bomb_place.mp3", 2812, false)
+
+constant MAX_XPLOSIVES_NAME = "Maximum Reached"
+
+function getMaxXplo(int lvl) returns int
+	return 2 + lvl
+	
+function getXplosionRadius(int lvl) returns real
+	return 200. + 64 * lvl
+	
+function getXplosionPower(int lvl) returns real
+	return 50. + 10 * lvl
+	
+function getXplosionCooldown(int lvl) returns real
+	return 10 - 2.*lvl
+	
+function getXplosionManaCost(int lvl) returns int
+	return 35 + 20 * lvl
+
+public function registerHeroXplo(Hero h)
+	let t = CreateTrigger()
+	t..registerPlayerUnitEvent(h.owner, EVENT_PLAYER_HERO_SKILL, null)
+	..addAction(() -> begin
+		if GetLearnedSkill() == EXPLOSIVES_SPELL_ID and GetLearningUnit().hasAbility(MAX_EXPLOSIVES_ID)
+			GetLearningUnit()..removeAbility(MAX_EXPLOSIVES_ID)..addAbility(EXPLOSIVES_SPELL_ID)
+	end)
+	
+public function createXplosive(vec2 target, Hero caster, int lvl)
+	new Xplosive(target, caster, lvl)
+	if Xplosive.count >= getMaxXplo(lvl)
+		caster.actor..removeAbility(EXPLOSIVES_SPELL_ID)..addAbility(MAX_EXPLOSIVES_ID)..setAbilityLevel(MAX_EXPLOSIVES_ID, lvl)
+
+public class Xplosive extends Explosive
+	static int count = 0
+	Hero caster
+	real tz
+	
+	construct(vec2 target, Hero caster, int lvl)
+		super(target.withTerrainZ() + vec3(0,0,75), getXplosionRadius(lvl), getXplosionPower(lvl), caster.owner, angle(GetRandomReal(0, PI2)), "Units\\Other\\TNTBarrel\\TNTBarrel.mdx")
+		this.caster = caster
+		count++
+		PLACE_SOUND.playSimulatePoint(target)
+		tz = getTZ()
+		active = true
+		
+		
+		
+	override function explode()
+		if not active
+			let tmppos = getPosUnsafe2()
+			addEffect("Models\\SapperExplo.mdx", tmppos).destr()
+			forUnitsInRange(tmppos, explosionRadius, (unit u) -> begin
+				if u.isAliveTrick() and u.getEntity() instanceof Creep
+					let up = u.getPos()
+					let distSQ = tmppos.distToVecSquared(up)
+					let angl = up.angleTo(tmppos)
+					let p = 1 - distSQ / (explosionRadius.squared())
+					caster.actor.damageTarget(u, power*p) 
+					if u.isAliveTrick() and p > 0.6
+						let pp = p-0.6 * 4
+						u.getEntity().setVel(vec3(angl.cos()*power/5*pp,angl.sin()*power/5*pp, power/2))
+					u.addXBurn(caster, 1)
+			end)
+			destroy this
+	
+	override function update()
+		if getZ() > tz
+			setPosZ(bezier_3(tz + 75, tz+1, tz-5, (1- (getZ()-tz) / 75) + 0.01), false)
+		else if active
+			active = false
+			addEffect("Objects\\Spawnmodels\\Other\\ToonBoom\\ToonBoom.mdl", getPosUnsafe2()).destr()
+			
+		
+	
+	ondestroy
+		count--
+		if caster.actor.hasAbility(MAX_EXPLOSIVES_ID)
+			caster.actor..removeAbility(MAX_EXPLOSIVES_ID)..addAbility(EXPLOSIVES_SPELL_ID)
+			
+
+	
+public function init_Xplosives(boolean c)
+	EXPLOSIVES_SPELL_ID = ABIL_ID_GEN.next()
+	MAX_EXPLOSIVES_ID = ABIL_ID_GEN.next()
+	if c
+		
+		let xplosivePreset = new ChannelAbilityPreset(EXPLOSIVES_SPELL_ID, 4)
+		xplosivePreset..removeChannelProperties(true, true)..setName("Xplosives")
+		..presetButtonPosNormal(0,2)..presetIcon("BTNExplosiveBarrel")
+		..presetTargetTypes(Targettype.PTARGET)..presetOption(Option.TARGETIMAGE, true)
+		..presetAreaofEffect((int lvl) -> 128.)..presetHotkey(XPLOSIVES_HOTKEY)
+		..setCastRange(1, 180)..setRequiredLevel(2)
+		for i = 1 to 4
+			xplosivePreset..setCooldown(i, getXplosionCooldown(i))
+			..setManaCost(i, getXplosionManaCost(i))
+		new AbilityTooltipGenerator(XPLOSIVES_NAME, XPLOSIVES_HOTKEY, Targettype.PTARGET, XPLOSIVES_MAXLVL, "Bombz")
+		..addProperty("Cooldown:", (int lvl) -> getXplosionCooldown(lvl).toString())
+		..addProperty("Mana Cost:", (int lvl) -> getXplosionManaCost(lvl).toString())
+		..addProperty("Cast Range:", (180.).toString())
+		..addProperty("Area of Effect:", (int lvl) -> getXplosionRadius(lvl).toString())
+		..addProperty("Xplosion Power:", (int lvl) -> getXplosionPower(lvl).toString())
+		..applyToDef(xplosivePreset)
+	
+		
+		let xdum = new AbilityDefinitionBashcreep(MAX_EXPLOSIVES_ID)
+		xdum..setChancetoBash(1, 0)..setChancetoMiss(1, 0)..presetButtonPosNormal(0, 2)
+		..presetIcon("PASExplosiveBarrel")..setName("Maximum Amount")
+		new AbilityTooltipGenerator(MAX_XPLOSIVES_NAME, "", Targettype.PASSIVE, 4, "You reached the maximum Xplosives for this level.")
+		..addProperty("Maximum Amount:", (int lvl) -> getMaxXplo(lvl).toString())
+		..applyToDef(xdum)
+			
+	

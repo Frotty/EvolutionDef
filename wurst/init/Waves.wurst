@@ -1,0 +1,149 @@
+package Waves
+import public WavePool
+import WaveManager
+import MapStuff
+
+/** Creates and returns a list of all Waves */
+public function allWaves() returns Queue<WavePool>
+	let queue = new Queue<WavePool>()
+	// Add the waves from below here
+	queue.enqueue(wave_1())
+	queue.enqueue(wave_2())
+	queue.enqueue(wave_3())
+	queue.enqueue(wave_4())
+	queue.enqueue(wave_5())
+	queue.enqueue(wave_6())
+	// Return all waves
+	return queue
+
+/** Every Single Wave creates a WavePool and returns it */
+public function wave_1() returns WavePool
+	//Wave 1 spawns zombies to make players ready, and to let them know their heroes. Survivable with basic attacks
+
+	// Create the pool
+	let pool = new WavePool()
+	// Create a CreepDefinition. Use a distinctive Name here for later copies
+	var def = new CreepDefinition("Lesser Zombie")
+	// Set Values..
+	def.hp = 95
+	def.modelPath = "units\\creeps\\Zombie\\Zombie.mdl"
+	def.scale = 0.9
+	def.collisionSize = 8
+	def.damage = 8
+	
+	// Add Def to pool with amount and time (when to spawn after wave started)
+	//Pool.setDuration is optional, its automatically set to the biggest spawn time.
+	//pool.setDuration(30)
+	
+	pool.addSpawn(def,1*playerNumber,0,SpawnerGroup.WEST)
+	pool.addSpawn(def,1*playerNumber,0.5,SpawnerGroup.WEST)
+	pool.addSpawn(def,1*playerNumber,8,SpawnerGroup.NORTH)
+	pool.addSpawn(def,1*playerNumber,8.5,SpawnerGroup.NORTH)
+	pool.addSpawn(def,1*playerNumber,18,SpawnerGroup.EAST)
+	pool.addSpawn(def,1*playerNumber,18.5,SpawnerGroup.EAST)
+	
+	// Return the pool
+	return pool
+	
+// Copy Example
+public function wave_2() returns WavePool
+	// Create the pool
+	let pool = new WavePool()
+	// Copy an existing CreepDef
+	// This still creates a new Object (as needed by the system)
+	// But reduces codeLength and copy-paste work (readability too)
+	var zom =new CreepDefinition("Zombie")
+	zom.hp = 155
+	zom.modelPath = "units\\creeps\\Zombie\\Zombie.mdl"
+	zom.collisionSize = 12
+	zom.damage = 10
+	zom.level = 2
+	
+	pool.addSpawn(copyCreepDef("Lesser Zombie"), playerNumber, 0, SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Lesser Zombie"), playerNumber, 5, SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Lesser Zombie"), playerNumber, 10, SpawnerGroup.ALL)
+	pool.addSpawn(zom, 2 * playerNumber , 15 , SpawnerGroup.WEST )
+	
+	return pool
+
+public function wave_3() returns WavePool
+	let pool = new WavePool()
+	
+	var def2 = new CreepDefinition("Assault Zombie", CreepType.FLIPPER)
+	def2.hp = 30
+	def2.modelPath = "units\\creeps\\Sasquatch\\Sasquatch.mdl"
+	def2.scale *= 0.7
+	def2.collisionSize = 4
+	def2.movementSpeed = 330
+	def2.damage = 13
+	def2.level = 3
+	
+	pool.addSpawn(def2,1,2.2,SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Zombie"), 3 + 1 * playerNumber ,0, SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Zombie"), 1 * playerNumber ,2., SpawnerGroup.ALL)
+	
+	return pool
+	
+public function wave_4() returns WavePool
+	let pool = new WavePool()
+	
+	var def2 = new CreepDefinition("Big Zombie")
+	def2.hp = 125
+	def2.modelPath = "units\\creeps\\Zombie\\Zombie.mdl"
+	def2.scale *= 1.3
+	def2.collisionSize = 4
+	def2.movementSpeed = 300
+	def2.damage = 20
+	def2.level = 2
+	
+	pool.addSpawn(def2,1,2.5,SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Zombie"), 1 * playerNumber,0, SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Lesser Zombie"), 2 * playerNumber,3, SpawnerGroup.ALL)
+	
+	return pool
+	
+public function wave_5() returns WavePool
+	let pool = new WavePool()
+	
+	var mam = new CreepDefinition("Mammoth", CreepType.MAMMOTH)
+	mam.hp = 300
+	mam.movementSpeed = 200
+	mam.modelPath = "Units\\Creeps\\MammothBlack\\MammothBlack.mdl"
+	mam.scale *= 1.3
+	mam.damage = 24
+	mam.level = 4
+	
+	pool.addSpawn(copyCreepDef("Lesser Zombie"),2*playerNumber,0,SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Zombie"),2*playerNumber,1, SpawnerGroup.ALL)
+	pool.addSpawn(mam,1,0,SpawnerGroup.WEST)
+	pool.addSpawn(copyCreepDef("Big Zombie"), 4, 0, SpawnerGroup.WEST)
+	
+	return pool
+		
+public function wave_6() returns WavePool
+	let pool = new WavePool()
+	
+	var col = new CreepDefinition("Colossus", CreepType.CREEP)
+	col.hp = 600
+	col.movementSpeed = 160
+	col.modelPath = "Units\\Creeps\\MammothBlack\\MammothBlack.mdl"
+	col.scale *= 2
+	col.damage = 32
+	col.level = 5
+	
+	pool.addSpawn(copyCreepDef("Zombie"),2*playerNumber,0,SpawnerGroup.ALL)
+	pool.addSpawn(copyCreepDef("Zombie"),2*playerNumber,1, SpawnerGroup.ALL)
+	pool.addSpawn( col , 1 + (0.2*playerNumber).toInt(),0,SpawnerGroup.WEST)
+	pool.addSpawn(copyCreepDef("Big Zombie"), 2*playerNumber , 0, SpawnerGroup.WEST)
+	
+	return pool
+	
+public function init_Waves(boolean c)
+	let waves = allWaves()
+	// This Creates the Definitions as well but doesn#t generate the Objects (obviously we can't do this ingame)
+	WaveManager.addAllWaves(waves)
+	if c
+		for w in waves
+			w.generateObjects()
+
+	

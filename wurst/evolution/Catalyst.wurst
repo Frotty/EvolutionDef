@@ -1,0 +1,33 @@
+package Catalyst
+import LinkedList
+import Chromosome
+
+/*  The Catalyst is our "Initiator".
+	It randomly generates the first Chromosomes of the game
+	Additionally, during each round, it collects the information
+	of fallen creatures and calculates their fitness.
+	At the end of each round, the Chromosomes of the best
+	performing creatures (highest fitness) are collected.
+	
+	The catalyst then replicates those Chromosomes,
+	producing the creatures for the next round.
+	
+	The Replicationprocess also mutates the new Chromosomes randomly,
+	resulting in different Populations each round.
+	
+	For gaming purposes an additional, globally random Bonus is applied,
+	to make creatures grow in strength over the course of the game.
+	The bonus is only randomized per round and applied to all creatures equally
+	in order to make the actual mutation/cross-over the evolution
+	and not an always increasing bonus. */
+
+public class Catalyst
+	
+	/** This function returns a LinkedList of 
+		randomized Chromosomes */
+	static function getPrimals() returns LinkedList<Chromosome>
+		SetRandomSeed(GetRandomInt(-999999, 999999))
+		let ll = new LinkedList<Chromosome>()
+		ll.add(new Chromosome())
+		return ll
+		

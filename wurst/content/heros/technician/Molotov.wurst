@@ -1,0 +1,104 @@
+package Molotov
+import Projectile
+import Lightning
+import Terrain
+import MapStuff
+import ChannelAbilityPreset
+import ClosureForGroups
+import XBurn
+import Hero
+import Napalm
+import Explosive
+import AbilityTooltipGenerator
+import Simulate3dSound
+import SoundHelper
+import ClosureEvents
+import Creep
+
+constant MOLOTOV_NAME = "Throw Molotov"
+constant MOLOTOV_HOTKEY = "E"
+constant MOLOTOV_MAXLVL = 4
+
+function getMolotovBounces(int lvl) returns int
+	return min(lvl, 3)
+	
+function getMolotovCastRange(int lvl) returns real
+	return 400 + 100.*lvl
+	
+function getMolotovCooldown(int lvl) returns real
+	return 18 - lvl * 2.
+	
+function getMolotovManaCost(int lvl) returns int
+	return 60
+	
+constant THROW_SOUND = new Sound("Sounds\\sfx_throw.mp3", 532, false)
+constant EXPLO_SOUND = new Sound("Sounds\\sfx_molotov_explo.mp3", 4021, false)
+public int MOLOTOV_SPELL_ID
+
+public class Molotov extends Projectile
+	int bounces
+	int lvl
+	Hero caster = null
+	
+	construct(vec3 pos, vec2 target, Hero caster, int lvl)
+		super(pos, caster.owner, pos.angleTo2d(target), "Models\\Molotov.mdx")
+		flying = true
+		bounces = getMolotovBounces(lvl)
+		setTarget(target, 325)
+		this.caster = caster
+		THROW_SOUND.playSimulatePoint(pos.toVec2())
+		active = true
+		
+		
+	override function update()
+		super.update()
+		if bounces < 0
+			destroy this
+		
+	override function onGroundHit()
+
+	override function onGround()
+		let pos = getPos2()
+		var nrml = getTerrainNormal(pos.x, pos.y, 4).norm()
+		addLightning("LEAS", false, getPos3(), getPos3()+nrml*40)
+		setPos3(getPos3()+nrml*2, false)
+		if getVel().dot(nrml) > 0
+			return
+			
+		var v = getVel().project(nrml)
+		v *= -2
+		applyVel(v)
+		EXPLO_SOUND.playSimulatePoint(pos)
+		fx.flash("Models\\FlameBomb.mdx")
+		forUnitsInRange(pos, 128, (unit u) -> begin
+			if u.isAlive() and u.getEntity() instanceof Creep
+				u.addXBurn(caster, 1)
+		end)
+		for n in freshNapalms
+			if getPos2().distToVecSquared(n.pos) < IGNITE_DISTANCE_SQ
+				n.ignite()
+		for e in explosiveEntities
+			if getPos2().distToVecSquared(e.getPos2()) < IGNITE_DISTANCE_SQ
+				e.explode()
+		bounces--
+
+
+public function init_Molotov(boolean c)
+	MOLOTOV_SPELL_ID = ABIL_ID_GEN.next()
+	
+	if c
+		let molotovPreset = new ChannelAbilityPreset(MOLOTOV_SPELL_ID, MOLOTOV_MAXLVL)
+		molotovPreset..setName("Molotov")..removeChannelProperties(true, true)
+		..presetIcon("BTNSunFragment")..presetTargetTypes(Targettype.PTARGET)
+		..presetButtonPosNormal(2, 2)..presetHotkey(MOLOTOV_HOTKEY)
+		for i = 1 to MOLOTOV_MAXLVL
+			molotovPreset..setCastRange(i, getMolotovCastRange(i))
+			..setCooldown(i, getMolotovCooldown(i))
+			..setManaCost(i, getMolotovManaCost(i))
+		new AbilityTooltipGenerator(MOLOTOV_NAME, MOLOTOV_HOTKEY, Targettype.PTARGET, MOLOTOV_MAXLVL, "Throws a burning Molotov into the target area.\nThe Molotov bounces.\n" + "When the Molotov hits the ground it ignites all Napalm and Xplosives near and burns enemies." )
+		..addProperty("Cooldown:", (int lvl) -> getMolotovCooldown(lvl).toString())
+		..addProperty("Mana Cost:", (int lvl) -> getMolotovManaCost(lvl).toString())
+		..addProperty("Cast Range:", (int lvl) -> getMolotovCastRange(lvl).toString())
+		..addProperty("Bounces:", (int lvl) -> getMolotovBounces(lvl).toString())
+		..applyToDef(molotovPreset)
+		

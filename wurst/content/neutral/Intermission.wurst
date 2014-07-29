@@ -1,0 +1,70 @@
+package Intermission
+import GameConstants
+import MapStuff
+import UnitObjEditing
+import Fx
+import ClosureTimers
+import LinkedList
+import initlater WaveManager
+import ObjectIds
+import AllwaysItemDefinitions
+import PauseItemDefinitions
+import initlater Hero
+import ItemObjEditing
+
+int SHOP_ID
+
+unit SHOP_UNIT
+timerdialog td
+public LinkedList<Hero> fallenHeros = new LinkedList<Hero>()
+
+
+public function startIntermission(real duration, string text)
+	let fx = new Fx(STATUE_POS.withZ(300), angle(0))
+	let t = getTimer()..start(duration, () -> begin
+		DestroyTimerDialog(td)
+		GetExpiredTimer().release()
+	end)
+	for h in fallenHeros
+		h.actor.revive(STATUE_POS.polarOffset(angle(GetRandomReal(0, PI2)), 100), true)
+		Hero.aliveCount++
+		h.deathTT.destr()
+		destroy h.crossFx
+	td = CreateTimerDialog(t)
+	TimerDialogDisplay(td, true)
+	TimerDialogSetTitle(td, "Intermission")
+	fx.setScale(2.)
+	fx.flash("Abilities\\Spells\\Undead\\ReplenishHealth\\ReplenishHealthCasterOverhead.mdl")
+	doPeriodicallyTimed(3, duration, (CallbackCounted cc) -> begin
+		fx.flash("Abilities\\Spells\\Undead\\ReplenishHealth\\ReplenishHealthCasterOverhead.mdl")
+	end)
+	printTimed("|cff086BAD>> |cffFFD64A" + text + "|r", duration-4)
+	printTimed("            |cffFFD64AYou can now regenerate and buy permanent items from the statue.", duration-4)
+	
+	//let requnit = createUnit(DUMMY_PLAYER,REQ_UNIT_ID,vec3(0,0,0),angle(0))
+	SHOP_UNIT..addAbility('ACnr')..addAbility('ANre')
+		
+	doAfter(duration, () -> begin
+		//requnit.kill()
+		SHOP_UNIT..removeAbility('ACnr')..removeAbility('ANre')
+		WaveManager.startNextWave()
+	end)
+	
+public function init_Intermission(boolean c)
+	SHOP_ID = UNIT_ID_GEN.next()
+	if c
+		let def = new BuildingDefinition(SHOP_ID, 'ngme')
+		def..setName("Statue")..setModelFile("Models\\Statue03_b.mdx")..setItemsSold("")..setNormalAbilities("Asid, Aneu")
+		..setPathingMap("")..setGroundTexture("")..setCollisionSize(0)..setSelectionScale(0.8)..setScalingValue(1.5)
+		var s = ""
+		for a in alwaysItemsIds // In package AlwaysItemDefinitions
+			s = s + idInteger2IdString(a) + ","
+		/*for p in pauseItems
+			s = s + idInteger2IdString(p.id) + ","
+		*/
+		s = s.substring(0, s.length()-1)
+		def.setItemsMade(s)
+		
+	else
+		SHOP_UNIT = createUnit(DUMMY_PLAYER, SHOP_ID, STATUE_POS, angle(0))
+	

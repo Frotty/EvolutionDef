@@ -1,0 +1,42 @@
+package Flipper
+import Creep
+import Hero
+import ClosureTimers
+import CollisionDetection
+
+trigger range_t
+constant FLIPPER_BOUNTY = 25
+
+public class Flipper extends Creep
+	CollisionCallback cc
+	boolean casting = false
+	
+	construct(vec3 pos, int id, angle a, vec2 target)
+		super( pos, id, a, target)
+		var eff1 = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl",actor,"hand left")
+		var eff2 = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl",actor,"hand right")
+		bounty = FLIPPER_BOUNTY
+		
+		cc = (unit hit, unit hitter) -> begin
+			if actor == hitter
+				if hit.getEntity() instanceof Hero and hit.isAliveTrick() and not casting
+					actor.setAnimation("Spell Slam")
+					actor.pause()
+					casting = true
+					doAfter(.3,()-> begin
+						actor.unpause()
+						if hit.isAliveTrick() and (getPos2().distToVec(hit.getEntity().getPos2()) < 128) and cc != null
+							eff1.destr()
+							eff2.destr()
+							var h = hit.getEntity() castTo Hero
+							let angl = h.getPos2().angleTo(getPos2())
+							let speed = 8.
+							h.applyVel(vec2(0,0).polarOffset(angl,speed).withZ(speed*1.9))
+							actor.removeOnHitCallback()
+							destroy cc
+						else 
+							casting = false
+					end)
+		end
+		
+		actor.registerOnHitCallback(96, false, cc )

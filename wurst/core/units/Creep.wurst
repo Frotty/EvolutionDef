@@ -1,0 +1,132 @@
+package Creep
+import public Entity
+import MapStuff
+import Players
+import UnitObjEditing
+import HashMap
+import GameConstants
+import LinkedListModule
+import Bounty
+import StateMachine
+import AiManager
+import PriorityAi
+import OnUnitEnterLeave
+import Decal
+
+public enum CreepType
+	CREEP
+	FLIPPER
+	MAMMOTH
+
+HashMap<int, CreepDefinition> creepDefs = new HashMap<int, CreepDefinition>()
+string array nameToId
+int defcount = 0
+
+public function copyCreepDef(string name) returns CreepDefinition
+	for i = 0 to defcount
+		if nameToId[i] == name
+			return creepDefs.get(i)
+	error("No CreepDefinition saved for name: \"" + name + "\"")
+	return null
+	
+trigger creepDeath = CreateTrigger()
+init
+	creepDeath.addAction(() -> begin
+		let creep = GetTriggerUnit().getEntity() castTo Creep
+		let killer = GetKillingUnit()
+		killer.getOwner().addGold(creep.bounty mod allPlayers.getSize())
+		for i = 0 to playerNumber-1
+			Player(i).addGold((creep.bounty) div allPlayers.getSize())
+			showBountyTextTag((creep.bounty) div allPlayers.getSize(), creep.actor, Player(i))
+		convertEntityToDecal(creep)
+		
+	end)
+	
+public class Creep extends Entity
+	vec2 target
+	int bounty = 5
+	boolean dead = false
+	use LinkedListModule
+	construct(vec3 pos, int id, angle a, vec2 target)
+		super(pos, createUnit(CREEP_PLAYER, id, pos, a))
+		this.target = target
+		this.bounty = bounty
+		creepDeath.registerUnitEvent(actor, EVENT_UNIT_DEATH)
+		sleeping = false
+		active = true
+		applyPriorityAi(this)
+		
+	ondestroy
+		AiManager.unregisterEntity(this)
+		
+		
+public class CreepDefinition
+	boolean generated = false
+	int id
+	int hp
+	int armor
+	string modelPath
+	string name
+	real scale = 0.8
+	real weightFac = 1 //Goes from 1 to 0, 0 is infinite mass and is not effected by forces.
+	real collisionSize = 16
+	integer movementSpeed = 270
+	int damage = 10
+	int attackRange = 80
+	real shadowSize = 80
+	int level = 1
+	vec2 shadowCenter = vec2(30,30)
+	CreepType ctype //Decides what class will be used for the creep.
+	
+	construct(string name) //Creates creep with default behaviour
+		this.name = name
+		nameToId[defcount] = name
+		creepDefs.put(defcount, this)
+		defcount++
+		id = UNIT_ID_GEN.next()
+		ctype = CREEP
+		
+	construct(string name, CreepType ct) //Use this if you want to create creep with advanced behaviour
+		this.name = name
+		nameToId[defcount] = name
+		creepDefs.put(defcount, this)
+		defcount++
+		id = UNIT_ID_GEN.next()
+		ctype = ct
+		
+	function copy() returns CreepDefinition
+		let cd = new CreepDefinition(name)
+		cd.hp = hp
+		cd.armor = armor
+		cd.modelPath = modelPath
+		cd.id = UNIT_ID_GEN.next()
+		cd.name = name
+		cd.scale = scale
+		cd.weightFac = weightFac
+		cd.collisionSize = collisionSize
+		cd.movementSpeed = movementSpeed
+		cd.damage = damage
+		cd.attackRange = attackRange
+		cd.shadowSize = shadowSize
+		cd.shadowCenter = shadowCenter
+		cd.ctype = ctype
+		return cd
+
+//	function createCreepEntity(vec3 pos) returns Creep
+//		let creep = new T(pos, id)
+//		return creep
+	
+	function generateObject()
+		if not generated
+			generated = true
+			let def = new UnitDefinition(id, 'ugho')
+			def..setName(name)..setHitPointsMaximumBase(hp)
+			..setDefenseBase(armor)..setModelFile(modelPath)
+			..setScalingValue(scale)..setCollisionSize(collisionSize)
+			..setAttack1Range(attackRange)..setSpeedBase(movementSpeed)
+			..setAttack1DamageBase(damage)..setAttack1DamageNumberofDice(3)..setAttack1DamageSidesperDie(2)
+			..setShadowImageHeight(shadowSize)..setShadowImageWidth(shadowSize)
+			..setShadowImageCenterX(shadowCenter.x)..setShadowImageCenterY(shadowCenter.y)
+			..setFoodCost(1)..setLevel(level)
+			
+	

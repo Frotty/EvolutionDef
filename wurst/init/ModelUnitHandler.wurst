@@ -1,0 +1,32 @@
+package ModelUnitHandler
+import HashMap
+import ObjectIdGenerator
+import UnitObjEditing
+
+constant EVO_ID_GEN = new IdGenerator('0000')
+
+Table t = new Table()
+int array modelUnitIds
+int mucount = 0
+
+public function addModelPath(string path, boolean c) returns int 
+	let hash = StringHash(path)
+	if not t.hasBoolean(hash)
+		t.saveBoolean(hash, true)
+		t.saveInt(hash, mucount)
+		for i = 0 to 7
+			modelUnitIds[mucount*6 + i] = EVO_ID_GEN.next()
+			if c
+				let def = new UnitDefinition(modelUnitIds[mucount*6 + i], 'ugho')
+				..setAttack1AttackType(i castTo AttackType)
+				..setModelFile(path)
+		mucount++
+		return mucount-1
+	else
+		return t.loadInt(hash)
+		
+public function getUnitIdFromModelPath(string path) returns int
+	let hash = StringHash(path)
+	return modelUnitIds[t.loadInt(hash)]
+		
+

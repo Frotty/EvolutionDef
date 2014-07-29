@@ -1,0 +1,89 @@
+package GameInit
+import MapStuff
+import Spawner
+import ClosureTimers
+import Entity
+import WaveManager
+import Waves
+import StunHandler
+import Technician
+import Crusader
+import Mage
+import Specialist
+import Mammoth
+import OrderStringFactory
+import Picking
+import CollisionDetection
+import Shield
+import GameConstants
+import Intermission
+import CustomExp
+import Items
+import Vampire
+import AllwaysItemDefinitions
+import PauseItemDefinitions
+import AiManager
+import PriorityAi
+import Decal
+import DebugRoundInfo
+
+function initResources(boolean compileTime)
+	init_PriorityAi(compileTime)
+	init_Players(compileTime)
+	init_MageHero(compileTime)
+	init_Crusader(compileTime)
+	init_Technician(compileTime)
+	init_Specialist(compileTime)
+	init_Picking(compileTime)
+	init_Spawner(compileTime)
+	init_AllwaysItems(compileTime)
+	init_PauseItems(compileTime)
+	init_Waves(compileTime)
+	init_Intermission(compileTime)
+	init_StunHandler(compileTime)
+	init_Mammoth(compileTime)
+	init_CollisionDetection(compileTime, 16, 256)
+	initDecals(compileTime)
+	init_AiManager(compileTime)
+	init_VampireBoss(compileTime)
+	if compileTime
+		init_Items(compileTime)
+	else
+		nullTimer(() -> begin
+			init_Items(compileTime)
+			init_Intermission(compileTime)
+		end)
+		
+	TypeWriter.enqueue("runningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunningrunning")
+	
+
+boolean testing = true
+
+init
+	doAfter(0.01, () -> begin
+		initResources(false)
+		if testing
+			let h = new Crusader(vec3(0,300,800),Player(0) )  
+			let s = new Specialist(vec3(0,100,800),Player(1) ) // Fortesting
+			SetPlayerState(Player(0),PLAYER_STATE_RESOURCE_GOLD,5400)
+
+//			SetHeroLevel(h.actor, 4, false)
+//			SetHeroLevel(s.actor, 4, false)
+			startIntermission(10, "You have 20 seconds till the first attack..")
+			
+		else
+			//Welcome message
+			print("Welcome to |cffffcc00Hill Defense!|r")
+			
+			print("|cff22ccffHumanity is at extinction! The last heroes standing chose the perfect place to defend.\n" +
+				"A mountain ridge with a holy statue defending and blessing them.\n" +
+				"Sadly the statue can only give temporal defense, and the zombies are getting stronger!" +
+				"Chose your champion wisely to endure the great challange|r")
+			
+			createPickabes()
+				
+		startEntityLoop()
+	end)
+	
+@compiletime function generateObjects()
+	initResources(true)

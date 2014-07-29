@@ -1,0 +1,26 @@
+package Gene
+import public FrequenceHandler
+
+/*
+	Genes are usually instanciated only once. I would use a module here but
+	modules can't be bound to types, so this is the way to go.
+
+*/
+
+public abstract class Gene
+	int tempGenotype = 0
+	
+	function decode(Frequence frq)
+		tempGenotype = frq.decode(getMaxGenotypes())
+		
+	function encode(Frequence frq)
+		frq.encode(tempGenotype, getMaxGenotypes())
+
+	abstract function getMaxGenotypes() returns int
+	
+	abstract function mutate(int amount)
+	
+	abstract function applyTo(unit u)
+	
+	function setRandomGenotype()
+		tempGenotype = GetRandomInt(0, getMaxGenotypes())

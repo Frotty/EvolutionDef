@@ -1,0 +1,46 @@
+package Chromosome
+import FrequenceHandler
+import LinkedList
+import Gene
+import UnitGene
+
+// Chromosome holds the (dna)frequence and can build a unit from it
+
+public class Chromosome
+	static UnitGene unitGene = new UnitGene()
+	static LinkedList<Gene> genes = new LinkedList<Gene>()	
+	Frequence frequence
+	
+	construct(string initialfrequence)
+		frequence.load(initialfrequence)
+		
+	construct()
+	
+	function encodeAll()
+		frequence = new Frequence()
+		let itr = genes.backiterator()
+		for gene from itr
+			gene.encode(frequence)
+		itr.close()
+		unitGene.encode(frequence)
+		
+	function decodeAll()
+		frequence = new Frequence()
+		unitGene.decode(frequence)
+		for gene in genes
+			gene.decode(frequence)
+		
+		
+		
+	function mutate()
+		
+		
+	/** Create the unit based off the frequence */
+	function createUnit() returns unit
+		let u = unitGene.getUnit()
+		for gene in genes
+			gene.applyTo(u)
+		return u
+	
+	static function registerGene(Gene gene)
+		genes.add(gene)

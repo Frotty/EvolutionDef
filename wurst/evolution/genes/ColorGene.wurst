@@ -1,0 +1,23 @@
+package ColorGene
+import Gene
+
+public class ColorGene extends Gene
+	color currentColor
+	
+	override function decode(Frequence frq)
+		let b = frq.decode(255)
+		let g = frq.decode(255)
+		let r = frq.decode(255)
+		currentColor = color(r,g,b)
+		
+	override function encode(Frequence frq)
+		frq.encode(currentColor.red, 255)
+		frq.encode(currentColor.green, 255)
+		frq.encode(currentColor.blue, 255)
+
+	override function getMaxGenotypes() returns int
+		return 16777216
+	
+	override function mutate(int amount)
+	
+	override function applyTo(unit u)
