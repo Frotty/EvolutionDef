@@ -19,5 +19,10 @@ public class ColorGene extends Gene
 		return 16777216
 	
 	override function mutate(int amount)
+		currentColor.red += GetRandomInt(-3, 3) * amount
+		currentColor.green += GetRandomInt(-3, 3) * amount
+		currentColor.blue += GetRandomInt(-3, 3) * amount
+		currentColor = currentColor.normalize()
 	
 	override function applyTo(unit u)
+		u.setVertexColor(currentColor)

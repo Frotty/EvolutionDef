@@ -14,15 +14,21 @@ public class UnitGene extends Gene
 		dtype = frq.decode(DEFENSETYPES_AMOUNT)
 		atype = frq.decode(ATTACKTYPES_AMOUNT)
 		tempGenotype = frq.decode(getMaxGenotypes())
+		
+	override function encode(Frequence frq)
+		frq.encode(tempGenotype, getMaxGenotypes())
+		frq.encode(atype, ATTACKTYPES_AMOUNT)
+		frq.encode(dtype, DEFENSETYPES_AMOUNT)
 	
 	override function getMaxGenotypes() returns int
-		return 200
+		return 200 // TODO KARI
 	
 	override function mutate(int amount)
-	
+		// TODO KARI
+		
 	override function applyTo(unit u)
 		// Not needed as this gene has to choose the unit
 		
 	function getUnit() returns unit
-		return null
+		return null // TODO KARI
 
